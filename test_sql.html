@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef1f6; --panel: #ffffff; --ink: #1b2333; --muted: #6b7690;
+    --line: #dde3ee; --accent: #2f5bea; --accent-ink: #fff; --ok: #14804a;
+    --err: #c0352b; --warn: #b76e00; --head: #f4f6fb; --hover: #f1f4fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151f; --panel: #1a2030; --ink: #e6eaf4; --muted: #8b96b0;
+      --line: #2a3248; --accent: #6b8cff; --accent-ink: #0d1220; --ok: #4cc38a;
+      --err: #ff7a70; --warn: #f0b04a; --head: #202840; --hover: #222b44;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+  .app { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0; font-weight: 600; letter-spacing: -.01em; }
+  h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; padding: 8px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-weight: 500; transition: background .15s, border-color .15s; }
+  button:hover { background: var(--hover); border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.08); }
+  button.danger:hover { border-color: var(--err); color: var(--err); }
+  #dirty { font-size: 13px; color: var(--warn); display: none; }
+  #dirty.on { display: inline; }
+  .layout { display: grid; grid-template-columns: 270px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  aside { padding: 14px; }
+  aside h2, .sec-title { font-size: 14px; margin: 0 0 10px; font-weight: 600; }
+  .tbl { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .tbl-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--head); gap: 6px; }
+  .tbl-name { font-weight: 600; cursor: pointer; border: 0; background: none; padding: 0; color: var(--ink); text-align: left; }
+  .tbl-name:hover { color: var(--accent); background: none; }
+  .tbl-count { font-size: 12px; color: var(--muted); }
+  .mini { padding: 2px 8px; font-size: 13px; }
+  .cols { list-style: none; margin: 0; padding: 8px 10px; font: 13px "JetBrains Mono", monospace; color: var(--muted); }
+  .cols li { display: flex; justify-content: space-between; gap: 8px; }
+  .cols b { color: var(--ink); font-weight: 500; }
+  main { display: grid; gap: 16px; min-width: 0; }
+  .editor { padding: 14px; }
+  textarea#sql { width: 100%; min-height: 190px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--bg); color: var(--ink); font: 14.5px/1.6 "JetBrains Mono", Consolas, monospace; tab-size: 2; }
+  .editor-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 8px; }
+  .hint { font-size: 13px; color: var(--muted); }
+  kbd { font: 12px "JetBrains Mono", monospace; background: var(--head); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .result { padding: 14px; }
+  .status { font-size: 13px; margin-bottom: 10px; color: var(--muted); }
+  .status.ok { color: var(--ok); } .status.err { color: var(--err); white-space: pre-wrap; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table.rs { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .rs th, .rs td { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .rs th { background: var(--head); font-weight: 600; position: sticky; top: 0; }
+  .rs tbody tr:hover { background: var(--hover); }
+  .rs tbody tr:last-child td { border-bottom: 0; }
+  .rs td.num { text-align: right; font-family: "JetBrains Mono", monospace; }
+  .rs td.null { color: var(--muted); font-style: italic; }
+  .filters { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; }
+  .flt { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+  .field select { width: 100%; padding: 8px 10px; }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(440px, 92vw); background: var(--panel); color: var(--ink); }
+  dialog::backdrop { background: rgba(10,14,25,.5); }
+  dialog h3 { margin: 0 0 14px; font-size: 17px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .dlg-err { color: var(--err); font-size: 13px; min-height: 18px; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 8px; opacity: 0; pointer-events: none; transition: .25s; font-size: 14px; }
+  #toast.show { opacity: 1; transform: translateX(-50%); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>SQL Playground<small>Chạy thử truy vấn ngay trên trình duyệt (SQLite)</small></h1>
+    <div class="actions">
+      <span id="dirty">● Chưa lưu được vào trình duyệt</span>
+      <button id="btnExport" title="Tải database về máy dạng file .db">Xuất file .db</button>
+      <button id="btnImport" title="Mở file .db đã xuất trước đó">Mở file .db</button>
+      <input type="file" id="fileIn" accept=".db,.sqlite,.sqlite3" hidden>
+      <button id="btnSave">Lưu dữ liệu</button>
+      <button id="btnReset" class="danger">Làm mới</button>
+      <button id="btnRun" class="primary">Chạy</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="card">
+      <h2>Các bảng</h2>
+      <div id="tables"></div>
+    </aside>
+
+    <main>
+      <section class="card editor">
+        <textarea id="sql" spellcheck="false">SELECT M.MAMH, M.TENMH, AVG(KQ.DIEM) AS TB_DIEM
+FROM MON M
+JOIN KETQUA KQ ON M.MAMH = KQ.MAMH
+GROUP BY M.MAMH, M.TENMH
+HAVING AVG(KQ.DIEM) > 6;</textarea>
+        <div class="editor-foot">
+          <span class="hint">Nhấn <kbd>Ctrl</kbd> + <kbd>Enter</kbd> để chạy. Bôi đen một đoạn để chỉ chạy đoạn đó.</span>
+          <button id="btnClear">Xóa câu lệnh</button>
+        </div>
+      </section>
+
+      <section class="card result">
+        <div class="sec-title">Kết quả</div>
+        <div id="status" class="status">Chưa chạy câu lệnh nào.</div>
+        <div id="ketqua"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <h3 id="dlgTitle">Thêm dữ liệu</h3>
+  <div id="dlgFields"></div>
+  <div class="dlg-err" id="dlgErr"></div>
+  <div class="dlg-actions">
+    <button id="dlgCancel">Hủy</button>
+    <button id="dlgOk" class="primary">Thêm dòng</button>
+  </div>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+const KEY = "sql-playground-db";
+const SEED = `
+  CREATE TABLE MON (MAMH TEXT PRIMARY KEY, TENMH TEXT);
+  CREATE TABLE SINHVIEN (MASV TEXT PRIMARY KEY, HOTEN TEXT);
+  CREATE TABLE KETQUA (MASV TEXT, MAMH TEXT, LANTHI INTEGER, DIEM REAL);
+  INSERT INTO MON VALUES ('CS01','Co so du lieu'),('CS02','Cau truc du lieu'),('CS03','Mang may tinh');
+  INSERT INTO SINHVIEN VALUES ('SV01','Nguyen Van A'),('SV02','Tran Thi B');
+  INSERT INTO KETQUA VALUES
+    ('SV01','CS01',1,8),('SV02','CS01',1,7),
+    ('SV01','CS02',1,5),('SV02','CS02',1,6),
+    ('SV01','CS03',1,9),('SV02','CS03',1,4.5);
+`;
+let SQL, db, dirty = false, addingTo = null, cols = [];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.id); toast.id = setTimeout(() => t.classList.remove("show"), 2200);
+}
+function setDirty(v) { dirty = v; $("dirty").classList.toggle("on", v); }
+
+/* ---------- lưu / nạp dữ liệu ---------- */
+function toB64(u8) { let s = ""; for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode(...u8.subarray(i, i + 8192)); return btoa(s); }
+function fromB64(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)); }
+
+function loadDb() {
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (saved) return new SQL.Database(fromB64(saved));
+  } catch (e) { /* bộ nhớ trống hoặc lỗi -> dùng dữ liệu mẫu */ }
+  const d = new SQL.Database(); d.run(SEED); return d;
+}
+function save(silent) {
+  try {
+    localStorage.setItem(KEY, toB64(db.export()));
+    setDirty(false);
+    if (!silent) toast("Đã lưu dữ liệu vào trình duyệt");
+    return true;
+  } catch (e) {
+    setDirty(true);
+    toast("Không lưu được vào trình duyệt. Hãy dùng nút Xuất file .db");
+    return false;
+  }
+}
+function exportDb() {
+  const blob = new Blob([db.export()], { type: "application/x-sqlite3" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "qlsv.db";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast("Đã xuất file qlsv.db");
+}
+function importDb(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      db = new SQL.Database(new Uint8Array(r.result));
+      renderTables(); clearResult(); save(true); toast("Đã mở file " + file.name);
+    } catch (e) { toast("File không hợp lệ: " + e.message); }
+  };
+  r.readAsArrayBuffer(file);
+}
+function reset() {
+  if (!confirm("Làm mới sẽ xóa toàn bộ thay đổi và nạp lại dữ liệu mẫu. Tiếp tục?")) return;
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  db = new SQL.Database(); db.run(SEED);
+  setDirty(false); renderTables(); clearResult(); toast("Đã làm mới dữ liệu mẫu");
+}
+
+/* ---------- danh sách bảng ---------- */
+function tableList() {
+  const r = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
+  return r.length ? r[0].values.map(v => v[0]) : [];
+}
+function tableCols(t) {
+  return db.exec(`PRAGMA table_info("${t}")`)[0].values.map(v => ({ name: v[1], type: v[2] || "" }));
+}
+function renderTables() {
+  const names = tableList();
+  if (!names.length) { $("tables").innerHTML = '<div class="empty">Chưa có bảng nào.</div>'; return; }
+  $("tables").innerHTML = names.map(t => {
+    const n = db.exec(`SELECT COUNT(*) FROM "${t}"`)[0].values[0][0];
+    const c = tableCols(t).map(x => `<li><b>${esc(x.name)}</b><span>${esc(x.type.toLowerCase())}</span></li>`).join("");
+    return `<div class="tbl">
+      <div class="tbl-head">
+        <div><button class="tbl-name" data-view="${esc(t)}" title="Xem toàn bộ bảng">${esc(t)}</button><div class="tbl-count">${n} dòng</div></div>
+        <button class="mini" data-add="${esc(t)}">+ Thêm</button>
+      </div><ul class="cols">${c}</ul></div>`;
+  }).join("");
+}
+$("tables").addEventListener("click", e => {
+  const v = e.target.closest("[data-view]"), a = e.target.closest("[data-add]");
+  if (v) { $("sql").value = `SELECT * FROM ${v.dataset.view};`; runSql(); }
+  if (a) openAdd(a.dataset.add);
+});
+
+/* ---------- hiển thị kết quả (có ô chọn MASV, MAMH) ---------- */
+let last = null;
+const PICK = ["MASV", "MAMH"];
+function drawResult() {
+  const { columns, values, ms, filters } = last;
+  const rows = values.filter(r => columns.every((c, i) => !filters[c] || String(r[i]) === filters[c]));
+  const bar = columns.map((c, i) => {
+    if (!PICK.includes(c.toUpperCase())) return "";
+    const opts = [...new Set(values.map(r => r[i]))].filter(v => v !== null).sort();
+    return `<label class="flt">${esc(c)}
+      <select data-col="${esc(c)}"><option value="">Tất cả</option>${opts.map(o =>
+        `<option ${String(o) === filters[c] ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
+  }).join("");
+  const head = columns.map(c => `<th>${esc(c)}</th>`).join("");
+  const body = rows.length ? rows.map(r => "<tr>" + r.map(c =>
+    c === null ? '<td class="null">NULL</td>'
+    : `<td class="${typeof c === "number" ? "num" : ""}">${esc(c)}</td>`).join("") + "</tr>").join("")
+    : `<tr><td colspan="${columns.length}" class="empty">Không có dòng nào thỏa điều kiện.</td></tr>`;
+  $("status").className = "status ok";
+  $("status").textContent = `${rows.length}${rows.length !== values.length ? " / " + values.length : ""} dòng, ${ms} ms`;
+  $("ketqua").innerHTML = (bar ? `<div class="filters">${bar}</div>` : "") +
+    `<div class="scroll"><table class="rs"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+$("ketqua").addEventListener("change", e => {
+  const sel = e.target.closest("select[data-col]");
+  if (sel && last) { last.filters[sel.dataset.col] = sel.value; drawResult(); }
+});
+
+/* ---------- chạy SQL ---------- */
+function clearResult() { $("ketqua").innerHTML = ""; $("status").className = "status"; $("status").textContent = "Chưa chạy câu lệnh nào."; }
+function runSql() {
+  const ta = $("sql");
+  const sel = ta.value.substring(ta.selectionStart, ta.selectionEnd).trim();
+  const sql = sel || ta.value;
+  const st = $("status"), out = $("ketqua");
+  if (!sql.trim()) { st.className = "status err"; st.textContent = "Chưa có câu lệnh nào để chạy."; return; }
+  const t0 = performance.now();
+  try {
+    const before = db.getRowsModified();
+    const res = db.exec(sql);
+    const ms = (performance.now() - t0).toFixed(1);
+    const isRead = /^\s*(select|with|pragma)/i.test(sql);
+    if (!isRead) { renderTables(); save(true); }
+    if (!res.length) {
+      out.innerHTML = "";
+      st.className = "status ok";
+      st.textContent = `Chạy xong sau ${ms} ms. Số dòng bị ảnh hưởng: ${db.getRowsModified()}.`;
+      return;
+    }
+    const { columns, values } = res[res.length - 1];
+    last = { columns, values, ms, filters: {} };
+    drawResult();
+  } catch (e) {
+    out.innerHTML = "";
+    st.className = "status err";
+    st.textContent = "Lỗi: " + e.message;
+  }
+}
+
+/* ---------- thêm dữ liệu ---------- */
+function refOptions(t, col) {
+  const map = { MASV: ["SINHVIEN", "HOTEN"], MAMH: ["MON", "TENMH"] };
+  const m = map[col.toUpperCase()];
+  if (!m || m[0] === t.toUpperCase() || !tableList().includes(m[0])) return null;
+  try {
+    const r = db.exec(`SELECT "${col}", ${m[1]} FROM ${m[0]} ORDER BY 1`);
+    return r.length ? r[0].values : null;
+  } catch (e) { return null; }
+}
+function openAdd(t) {
+  addingTo = t; cols = tableCols(t);
+  $("dlgTitle").textContent = `Thêm dòng vào bảng ${t}`;
+  $("dlgErr").textContent = "";
+  $("dlgFields").innerHTML = cols.map((c, i) => {
+    const ref = refOptions(t, c.name);
+    const input = ref
+      ? `<select id="f${i}">${ref.map(o => `<option value="${esc(o[0])}">${esc(o[0])}${o[1] ? " - " + esc(o[1]) : ""}</option>`).join("")}</select>`
+      : `<input id="f${i}" autocomplete="off">`;
+    return `<div class="field"><label for="f${i}">${esc(c.name)} <span>(${esc(c.type.toLowerCase() || "text")})</span></label>${input}</div>`;
+  }).join("");
+  $("dlg").showModal(); $("f0").focus();
+}
+function submitAdd() {
+  const vals = cols.map((c, i) => {
+    const v = $("f" + i).value.trim();
+    if (v === "") return null;
+    return /INT|REAL|FLOAT|NUM|DEC/i.test(c.type) ? Number(v) : v;
+  });
+  if (vals.some((v, i) => typeof v === "number" && isNaN(v))) { $("dlgErr").textContent = "Cột kiểu số phải nhập số."; return; }
+  try {
+    db.run(`INSERT INTO "${addingTo}" VALUES (${cols.map(() => "?").join(",")})`, vals);
+    $("dlg").close(); renderTables(); save(true); toast("Đã thêm 1 dòng vào " + addingTo);
+    $("sql").value = `SELECT * FROM ${addingTo};`; runSql();
+  } catch (e) { $("dlgErr").textContent = "Lỗi: " + e.message; }
+}
+$("dlgOk").onclick = submitAdd;
+$("dlgCancel").onclick = () => $("dlg").close();
+$("dlgFields").addEventListener("keydown", e => { if (e.key === "Enter") submitAdd(); });
+
+/* ---------- sự kiện chung ---------- */
+$("btnRun").onclick = runSql;
+$("btnSave").onclick = () => save(false);
+$("btnExport").onclick = exportDb;
+$("btnImport").onclick = () => $("fileIn").click();
+$("fileIn").onchange = e => { if (e.target.files[0]) importDb(e.target.files[0]); e.target.value = ""; };
+$("btnReset").onclick = reset;
+$("btnClear").onclick = () => { $("sql").value = ""; $("sql").focus(); };
+$("sql").addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); runSql(); }
+  if (e.key === "Tab") { e.preventDefault(); const ta = e.target, s = ta.selectionStart; ta.setRangeText("  ", s, ta.selectionEnd, "end"); }
+});
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+(async function init() {
+  SQL = await initSqlJs({ locateFile: f => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + f });
+  db = loadDb(); renderTables(); runSql();
+})();
+</script>
+</body>
+</html>
